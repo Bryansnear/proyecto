@@ -1,0 +1,218 @@
+<!-- static/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Recommender</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        input[type="number"] {
+            padding: 8px 12px;
+            width: 100px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .movie-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .movie-table th, .movie-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .movie-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .loading {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+            font-style: italic;
+        }
+        .error {
+            color: #dc3545;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .poster-img {
+            width: 80px;
+            height: 120px;
+            object-fit: cover;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Movie Recommendation System</h1>
+        
+        <div class="form-group">
+            <label for="userId">Enter User ID:</label>
+            <input type="number" id="userId" min="1" value="1">
+            <button onclick="getRecommendations()">Get Recommendations</button>
+        </div>
+        
+        <div id="loading" class="loading" style="display: none;">
+            Loading recommendations...
+        </div>
+        
+        <div id="error" class="error" style="display: none;"></div>
+        
+        <table id="movieTable" class="movie-table" style="display: none;">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Poster</th>
+                    <th>Title</th>
+                    <th>Year</th>
+                    <th>Genre</th>
+                    <th>Rating</th>
+                </tr>
+            </thead>
+            <tbody id="movieTableBody">
+                <!-- Movie rows will be inserted here -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        async function getRecommendations() {
+            const userId = document.getElementById('userId').value;
+            
+            if (!userId) {
+                showError("Please enter a user ID");
+                return;
+            }
+            
+            // Show loading, hide table and error
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('movieTable').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+            
+            try {
+                // Get recommendations
+                const response = await fetch(`/recommend/${userId}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Error: ${response.status}`);
+                }
+                
+                // Get movie IDs
+                const text = await response.text();
+                const movieIds = text.split(',');
+                
+                // Get movie details and display
+                await displayMovies(movieIds);
+                
+            } catch (error) {
+                showError(`Failed to get recommendations: ${error.message}`);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+        
+        async function displayMovies(movieIds) {
+            const tableBody = document.getElementById('movieTableBody');
+            tableBody.innerHTML = ''; // Clear existing content
+            
+            try {
+                let index = 1;
+                
+                for (const movieId of movieIds) {
+                    try {
+                        // Get movie details
+                        const response = await fetch(`/movie/${movieId}`);
+                        
+                        if (!response.ok) {
+                            continue; // Skip this movie
+                        }
+                        
+                        const movie = await response.json();
+                        
+                        // Create table row
+                        const row = document.createElement('tr');
+                        
+                        // Add movie data to row
+                        row.innerHTML = `
+                            <td>${index}</td>
+                            <td><img src="${movie.poster || 'https://via.placeholder.com/80x120?text=No+Image'}" 
+                                alt="${movie.title}" class="poster-img"></td>
+                            <td>${movie.title || 'Unknown'}</td>
+                            <td>${movie.year || 'N/A'}</td>
+                            <td>${movie.genre || 'N/A'}</td>
+                            <td>${movie.imdb_rating || 'N/A'}</td>
+                        `;
+                        
+                        tableBody.appendChild(row);
+                        index++;
+                        
+                    } catch (error) {
+                        console.error(`Error fetching details for movie ${movieId}:`, error);
+                    }
+                }
+                
+                // Show the table if we have any movies
+                document.getElementById('movieTable').style.display = 
+                    (index > 1) ? 'table' : 'none';
+                
+                if (index === 1) {
+                    showError("No movie details found");
+                }
+                
+            } catch (error) {
+                showError(`Failed to display movies: ${error.message}`);
+            }
+        }
+        
+        function showError(message) {
+            const errorElement = document.getElementById('error');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            document.getElementById('loading').style.display = 'none';
+        }
+        
+        // Load recommendations for user 1 on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            getRecommendations();
+        });
+    </script>
+</body>
+</html>
