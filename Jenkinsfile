@@ -43,14 +43,8 @@ pipeline {
                     docker container prune -f
                     docker volume prune -f
                     
-                    echo "Verificando redes Docker..."
-                    docker network ls
-                    if docker network ls | grep -q movie-recommender_app-network; then
-                        echo "Eliminando red existente..."
-                        docker network rm movie-recommender_app-network || true
-                    fi
-                    echo "Creando nueva red Docker..."
-                    docker network create movie-recommender_app-network
+                    echo "Limpiando ambiente Docker Compose..."
+                    docker-compose down -v
                     
                     echo "Construyendo y desplegando nuevo contenedor..."
                     docker-compose build movie-recommender
@@ -73,17 +67,13 @@ pipeline {
                     echo "Verificando red Docker..."
                     docker network ls
                     echo "Verificando contenedores en la red..."
-                    docker network inspect movie-recommender_app-network
+                    docker network inspect $(docker network ls --filter name=movie-recommender_app-network -q)
                     
                     echo "Esperando 30 segundos para que el servicio se inicie completamente..."
                     sleep 30
                     
-                    echo "Obteniendo IP del contenedor..."
-                    CONTAINER_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' movie-recommender-movie-recommender-1)
-                    echo "IP del contenedor: $CONTAINER_IP"
-                    
                     echo "Intentando acceder al servicio..."
-                    curl -v http://$CONTAINER_IP:8082/
+                    curl -v http://localhost:8082/
                 '''
             }
         }
