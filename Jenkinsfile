@@ -46,10 +46,12 @@ pipeline {
             steps {
                 bat '''
                     echo Deteniendo y eliminando contenedor anterior si existe...
-                    docker ps -q --filter "name=movie-recommender" | findstr "." && (
-                        docker stop movie-recommender
-                        docker rm movie-recommender
-                    ) || exit /b 0
+                    for /f "tokens=*" %%a in ('docker ps -q --filter "name=movie-recommender"') do (
+                        echo Deteniendo contenedor %%a
+                        docker stop %%a
+                        echo Eliminando contenedor %%a
+                        docker rm %%a
+                    )
                 '''
                 bat '''
                     echo Iniciando nuevo contenedor...
@@ -78,10 +80,12 @@ pipeline {
             bat 'rmdir /s /q venv'
             echo 'El pipeline ha fallado'
             bat '''
-                docker ps -q --filter "name=movie-recommender" | findstr "." && (
-                    docker stop movie-recommender
-                    docker rm movie-recommender
-                ) || exit /b 0
+                for /f "tokens=*" %%a in ('docker ps -q --filter "name=movie-recommender"') do (
+                    echo Deteniendo contenedor %%a
+                    docker stop %%a
+                    echo Eliminando contenedor %%a
+                    docker rm %%a
+                )
             '''
         }
     }
