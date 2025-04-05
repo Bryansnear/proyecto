@@ -24,6 +24,9 @@ pipeline {
                 bat """
                 ${PYTHON_PATH} -m venv venv
                 call venv\\Scripts\\activate.bat
+                ${PIP_PATH} install --upgrade pip
+                ${PIP_PATH} install wheel setuptools
+                ${PIP_PATH} install --only-binary :all: numpy pandas scikit-learn
                 ${PIP_PATH} install -r requirements.txt
                 """
                 
@@ -40,7 +43,6 @@ pipeline {
                 // Ejecutar pruebas
                 bat """
                 call venv\\Scripts\\activate.bat
-                ${PIP_PATH} install pytest
                 ${PYTHON_PATH} -m pytest test_api.py -v
                 """
             }
