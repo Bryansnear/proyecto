@@ -29,18 +29,13 @@ pipeline {
         stage('Build and Deploy') {
             steps {
                 sh '''
-                    # Detener y eliminar todos los contenedores existentes
-                    echo "Deteniendo y eliminando contenedores existentes..."
-                    docker-compose down -v || true
+                    # Detener todos los contenedores Docker
+                    echo "Deteniendo todos los contenedores Docker..."
+                    docker ps -q | xargs -r docker stop
+                    docker ps -aq | xargs -r docker rm
                     
-                    # Asegurarse de que los puertos estén libres
-                    for port in 8081 8082 9093; do
-                        pid=$(lsof -ti :$port || true)
-                        if [ ! -z "$pid" ]; then
-                            echo "Liberando puerto $port..."
-                            kill -9 $pid || true
-                        fi
-                    done
+                    # Eliminar todos los volúmenes y redes no utilizados
+                    docker system prune -f --volumes
                     
                     # Construir y desplegar nuevos contenedores
                     docker-compose up -d --build movie-recommender
@@ -64,6 +59,7 @@ pipeline {
             sh '''
                 rm -rf venv
                 docker-compose down -v || true
+                docker system prune -f --volumes || true
             '''
         }
     }
