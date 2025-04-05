@@ -3,10 +3,12 @@ import pandas as pd
 import numpy as np
 from sklearn.neighbors import NearestNeighbors  # Model 1: KNN
 from sklearn.decomposition import TruncatedSVD  # Model 2: SVD
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, accuracy_score, precision_score, recall_score, f1_score
 from scipy.sparse import csr_matrix
 import pickle
 import random
+import matplotlib.pyplot as plt
+import os
 
 class MovieRecommender:
     def __init__(self):
@@ -16,6 +18,7 @@ class MovieRecommender:
         self.ratings_df = None
         self.movies_df = None
         self.user_matrix = None
+        self.evaluation_metrics = {}  # Almacenar métricas de evaluación
     
     def load_data(self, movies_file='movies.csv', ratings_file='ratings.csv'):
         """Load datasets"""
@@ -45,22 +48,37 @@ class MovieRecommender:
         self.svd_model.fit(matrix)
         
         # Compare models and select the better one
-        knn_score = self._evaluate_model('knn')
-        svd_score = self._evaluate_model('svd')
+        knn_metrics = self._evaluate_model('knn')
+        svd_metrics = self._evaluate_model('svd')
         
-        print(f"Model evaluation - KNN: {knn_score:.4f}, SVD: {svd_score:.4f}")
+        # Almacenar métricas para referencia futura
+        self.evaluation_metrics = {
+            'knn': knn_metrics,
+            'svd': svd_metrics
+        }
         
-        # Lower error is better
-        self.best_model = 'svd' if svd_score < knn_score else 'knn'
-        print(f"Selected {self.best_model.upper()} as best model")
+        print("\nMétricas de evaluación:")
+        print(f"KNN - RMSE: {knn_metrics['rmse']:.4f}, Accuracy: {knn_metrics['accuracy']:.4f}, Precisión: {knn_metrics['precision']:.4f}")
+        print(f"SVD - RMSE: {svd_metrics['rmse']:.4f}, Accuracy: {svd_metrics['accuracy']:.4f}, Precisión: {svd_metrics['precision']:.4f}")
+        
+        # Lower RMSE is better
+        self.best_model = 'svd' if svd_metrics['rmse'] < knn_metrics['rmse'] else 'knn'
+        print(f"\nSeleccionado {self.best_model.upper()} como mejor modelo")
+        
+        # Generar y guardar gráfica de comparación
+        self._generate_comparison_plot()
     
     def _evaluate_model(self, model_type):
-        """Simple evaluation by hiding some ratings and trying to predict them"""
+        """Evaluación completa de modelos con múltiples métricas"""
         # Create a copy of ratings and hide 10% for testing
         sample_size = min(100, len(self.ratings_df) // 10)
         test_ratings = self.ratings_df.sample(sample_size)
         
-        errors = []
+        actual_ratings = []
+        predicted_ratings = []
+        binary_actual = []
+        binary_predicted = []
+        
         for _, row in test_ratings.iterrows():
             user_id = row['user_id']
             movie_id = row['movie_id']
@@ -72,12 +90,39 @@ class MovieRecommender:
                 else:
                     predicted = self._predict_rating_svd(user_id, movie_id)
                 
-                if predicted:
-                    errors.append((predicted - actual_rating) ** 2)
+                if predicted is not None:
+                    actual_ratings.append(actual_rating)
+                    predicted_ratings.append(predicted)
+                    
+                    # Convertir a clasificación binaria (películas recomendadas vs no recomendadas)
+                    # Consideramos una película recomendada si la calificación es >= 4
+                    binary_actual.append(1 if actual_rating >= 4 else 0)
+                    binary_predicted.append(1 if predicted >= 4 else 0)
             except:
                 pass
         
-        return np.sqrt(np.mean(errors)) if errors else float('inf')
+        # Calcular métricas
+        metrics = {}
+        
+        # RMSE (Root Mean Square Error)
+        if actual_ratings and predicted_ratings:
+            metrics['rmse'] = np.sqrt(mean_squared_error(actual_ratings, predicted_ratings))
+        else:
+            metrics['rmse'] = float('inf')
+        
+        # Accuracy, Precision, Recall, F1-score (para clasificación binaria)
+        if binary_actual and binary_predicted:
+            metrics['accuracy'] = accuracy_score(binary_actual, binary_predicted)
+            metrics['precision'] = precision_score(binary_actual, binary_predicted, zero_division=0)
+            metrics['recall'] = recall_score(binary_actual, binary_predicted, zero_division=0)
+            metrics['f1'] = f1_score(binary_actual, binary_predicted, zero_division=0)
+        else:
+            metrics['accuracy'] = 0
+            metrics['precision'] = 0
+            metrics['recall'] = 0
+            metrics['f1'] = 0
+        
+        return metrics
     
     def _predict_rating_knn(self, user_id, movie_id):
         """Predict a rating using KNN model"""
@@ -253,7 +298,8 @@ class MovieRecommender:
             'knn_model': self.knn_model,
             'svd_model': self.svd_model,
             'best_model': self.best_model,
-            'user_matrix': self.user_matrix
+            'user_matrix': self.user_matrix,
+            'evaluation_metrics': self.evaluation_metrics
         }
         with open(filepath, 'wb') as f:
             pickle.dump(model_data, f)
@@ -267,7 +313,64 @@ class MovieRecommender:
         self.svd_model = model_data['svd_model'] 
         self.best_model = model_data['best_model']
         self.user_matrix = model_data['user_matrix']
+        self.evaluation_metrics = model_data.get('evaluation_metrics', {})
         print(f"Model loaded from {filepath}")
+        
+        # Mostrar métricas si están disponibles
+        if self.evaluation_metrics:
+            print("\nMétricas de evaluación cargadas:")
+            for model, metrics in self.evaluation_metrics.items():
+                print(f"{model.upper()} - RMSE: {metrics['rmse']:.4f}, Accuracy: {metrics['accuracy']:.4f}, Precisión: {metrics['precision']:.4f}")
+    
+    def _generate_comparison_plot(self):
+        """Genera y guarda una gráfica comparando el accuracy y el error (RMSE) de ambos modelos"""
+        if not self.evaluation_metrics:
+            print("No hay métricas disponibles para generar la gráfica")
+            return
+        
+        # Crear directorio para gráficas si no existe
+        os.makedirs('graficas', exist_ok=True)
+        
+        # Preparar datos para la gráfica
+        models = ['KNN', 'SVD']
+        accuracy_values = [self.evaluation_metrics['knn']['accuracy'], self.evaluation_metrics['svd']['accuracy']]
+        rmse_values = [self.evaluation_metrics['knn']['rmse'], self.evaluation_metrics['svd']['rmse']]
+        
+        # Crear figura con dos subplots
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+        
+        # Gráfica de Accuracy
+        bars1 = ax1.bar(models, accuracy_values, color=['#3498db', '#e74c3c'])
+        ax1.set_title('Comparación de Accuracy', fontsize=14)
+        ax1.set_ylabel('Accuracy', fontsize=12)
+        ax1.set_ylim(0, 1.0)  # Accuracy está entre 0 y 1
+        
+        # Añadir valores sobre las barras
+        for bar in bars1:
+            height = bar.get_height()
+            ax1.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+                    f'{height:.4f}', ha='center', va='bottom')
+        
+        # Gráfica de RMSE
+        bars2 = ax2.bar(models, rmse_values, color=['#3498db', '#e74c3c'])
+        ax2.set_title('Comparación de Error (RMSE)', fontsize=14)
+        ax2.set_ylabel('RMSE', fontsize=12)
+        
+        # Añadir valores sobre las barras
+        for bar in bars2:
+            height = bar.get_height()
+            ax2.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+                    f'{height:.4f}', ha='center', va='bottom')
+        
+        # Ajustar diseño
+        plt.tight_layout()
+        
+        # Guardar gráfica
+        plt.savefig('graficas/comparacion_modelos.png', dpi=300, bbox_inches='tight')
+        print(f"Gráfica de comparación guardada en 'graficas/comparacion_modelos.png'")
+        
+        # Cerrar figura para liberar memoria
+        plt.close()
 
 # Function to train and save model
 def train_model_from_csv(movies_file='movies.csv', ratings_file='ratings.csv', save_to='recommender_model.pkl'):
