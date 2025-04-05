@@ -31,7 +31,7 @@ pipeline {
             steps {
                 bat """
                     call venv\\Scripts\\activate.bat
-                    pytest test_api.py -v
+                    venv\\Scripts\\pytest.exe test_api.py -v
                 """
             }
         }
