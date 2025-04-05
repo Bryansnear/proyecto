@@ -45,9 +45,14 @@ pipeline {
         stage('Deploy') {
             steps {
                 bat '''
-                    docker ps -q --filter "name=movie-recommender" | findstr "." && docker stop movie-recommender || exit /b 0
+                    echo Deteniendo y eliminando contenedor anterior si existe...
+                    docker ps -q --filter "name=movie-recommender" | findstr "." && (
+                        docker stop movie-recommender
+                        docker rm movie-recommender
+                    ) || exit /b 0
                 '''
                 bat '''
+                    echo Iniciando nuevo contenedor...
                     docker run -d --name movie-recommender ^
                         -p 8082:8082 ^
                         -e KAFKA_HOST=host.docker.internal ^
@@ -73,7 +78,10 @@ pipeline {
             bat 'rmdir /s /q venv'
             echo 'El pipeline ha fallado'
             bat '''
-                docker ps -q --filter "name=movie-recommender" | findstr "." && docker stop movie-recommender || exit /b 0
+                docker ps -q --filter "name=movie-recommender" | findstr "." && (
+                    docker stop movie-recommender
+                    docker rm movie-recommender
+                ) || exit /b 0
             '''
         }
     }
