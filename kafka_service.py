@@ -1,11 +1,23 @@
 # kafka_service.py
 import json
 import time
-from kafka import KafkaProducer, KafkaConsumer
 import datetime
+
+# Intentar importar kafka, si falla, usaremos un modo simulado
+try:
+    from kafka import KafkaProducer, KafkaConsumer
+    KAFKA_AVAILABLE = True
+except ImportError:
+    KAFKA_AVAILABLE = False
+    print("Kafka no está disponible - usando modo simulado")
 
 class MovieKafkaProducer:
     def __init__(self, bootstrap_servers=['localhost:9092'], topic='movie-recommendations-log'):
+        if not KAFKA_AVAILABLE:
+            self.connected = False
+            print("Kafka no está disponible - usando modo simulado")
+            return
+            
         try:
             self.producer = KafkaProducer(
                 bootstrap_servers=bootstrap_servers,
@@ -20,9 +32,12 @@ class MovieKafkaProducer:
     
     def log_recommendation(self, user_id, server, status, recommendations, response_time):
         """Log recommendation request to Kafka"""
-        if not self.connected:
-            print("Kafka producer not connected")
-            return False
+        if not KAFKA_AVAILABLE or not self.connected:
+            # En modo simulado, solo imprimimos el log
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+            message = f"{timestamp},{user_id},recommendation request {server}, status {status}, result: {recommendations}, {response_time}"
+            print(f"SIMULATED LOG: {message}")
+            return True
             
         try:
             timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
@@ -36,11 +51,16 @@ class MovieKafkaProducer:
     
     def close(self):
         """Close the Kafka producer"""
-        if self.connected:
+        if KAFKA_AVAILABLE and self.connected:
             self.producer.close()
 
 class MovieKafkaConsumer:
     def __init__(self, bootstrap_servers=['localhost:9092'], topic='movie-recommendations-log'):
+        if not KAFKA_AVAILABLE:
+            self.connected = False
+            print("Kafka no está disponible - usando modo simulado")
+            return
+            
         try:
             self.consumer = KafkaConsumer(
                 topic,
@@ -57,8 +77,9 @@ class MovieKafkaConsumer:
     
     def consume_logs(self):
         """Consume and print logs from Kafka"""
-        if not self.connected:
-            print("Kafka consumer not connected")
+        if not KAFKA_AVAILABLE or not self.connected:
+            print("Kafka no está disponible - usando modo simulado")
+            print("En modo simulado, no hay logs para consumir")
             return
             
         print("Starting to consume logs from Kafka...")
@@ -68,5 +89,5 @@ class MovieKafkaConsumer:
     
     def close(self):
         """Close the Kafka consumer"""
-        if self.connected:
+        if KAFKA_AVAILABLE and self.connected:
             self.consumer.close()
