@@ -1,78 +1,48 @@
 pipeline {
     agent any
     
-    environment {
-        PYTHON_PATH = 'C:/Users/bryan/AppData/Local/Programs/Python/Python312/python.exe'
-        PIP_PATH = 'C:/Users/bryan/AppData/Local/Programs/Python/Python312/Scripts/pip.exe'
-    }
-    
     stages {
-        stage('Checkout') {
+        stage('Setup') {
             steps {
-                checkout scm
-            }
-        }
-        
-        stage('Environment Setup') {
-            steps {
-                bat """
-                    "${PYTHON_PATH}" -m venv venv
-                    call venv\\Scripts\\activate.bat
-                    "${PIP_PATH}" install -r requirements.txt
-                """
-                bat """
-                    echo Verificando conexion a Kafka...
-                    netstat -an | findstr "9092"
-                """
+                sh '''
+                    apt-get update
+                    apt-get install -y python3 python3-pip python3-venv curl
+                '''
             }
         }
         
         stage('Test') {
             steps {
-                bat """
-                    call venv\\Scripts\\activate.bat
-                    "${PYTHON_PATH}" -m pytest test_api.py -v
-                """
-            }
-        }
-        
-        stage('Build Docker') {
-            steps {
-                bat 'docker build -t movie-recommender:latest .'
-            }
-        }
-        
-        stage('Deploy') {
-            steps {
-                bat '''
-                    echo Deteniendo y eliminando contenedor anterior si existe...
-                    docker ps -q --filter "name=movie-recommender" > container.txt
-                    if exist container.txt (
-                        for /f %%i in (container.txt) do (
-                            echo Deteniendo contenedor %%i
-                            docker stop %%i
-                            echo Eliminando contenedor %%i
-                            docker rm %%i
-                        )
-                        del container.txt
-                    )
+                sh '''
+                    python3 -m venv venv
+                    . venv/bin/activate
+                    pip install -r requirements.txt
+                    python -m pytest test_api.py -v
                 '''
-                bat '''
-                    echo Iniciando nuevo contenedor...
-                    docker run -d --name movie-recommender ^
-                        -p 8082:8082 ^
-                        -e KAFKA_HOST=host.docker.internal ^
-                        -e KAFKA_PORT=9092 ^
-                        movie-recommender:latest
+            }
+        }
+        
+        stage('Build and Deploy') {
+            steps {
+                sh '''
+                    # Detener y eliminar contenedor existente si existe
+                    if docker ps -a --format '{{.Names}}' | grep -q '^movie-recommender$'; then
+                        echo "Deteniendo y eliminando contenedor existente..."
+                        docker stop movie-recommender
+                        docker rm movie-recommender
+                    fi
+                    
+                    # Construir y desplegar nuevo contenedor
+                    docker-compose up -d --build movie-recommender
                 '''
             }
         }
         
         stage('Verify Deployment') {
             steps {
-                bat '''
-                    echo Esperando que la aplicacion este disponible...
-                    timeout /t 10 /nobreak
+                sh '''
+                    echo "Esperando que la aplicacion este disponible..."
+                    sleep 10
                     curl -f http://localhost:8082/
                 '''
             }
@@ -81,19 +51,13 @@ pipeline {
     
     post {
         always {
-            bat 'rmdir /s /q venv'
-            echo 'El pipeline ha fallado'
-            bat '''
-                docker ps -q --filter "name=movie-recommender" > container.txt
-                if exist container.txt (
-                    for /f %%i in (container.txt) do (
-                        echo Deteniendo contenedor %%i
-                        docker stop %%i
-                        echo Eliminando contenedor %%i
-                        docker rm %%i
-                    )
-                    del container.txt
-                )
+            sh '''
+                rm -rf venv
+                if docker ps -a --format '{{.Names}}' | grep -q '^movie-recommender$'; then
+                    echo "Limpiando contenedor..."
+                    docker stop movie-recommender || true
+                    docker rm movie-recommender || true
+                fi
             '''
         }
     }
