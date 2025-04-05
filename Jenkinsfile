@@ -29,6 +29,16 @@ pipeline {
         stage('Build and Deploy') {
             steps {
                 sh '''
+                    # Mostrar directorio actual y contenido
+                    pwd
+                    ls -la
+                    
+                    # Verificar que docker-compose.yml existe
+                    if [ ! -f "docker-compose.yml" ]; then
+                        echo "Error: docker-compose.yml no encontrado"
+                        exit 1
+                    fi
+                    
                     # Detener y eliminar contenedor existente si existe
                     if docker ps -a --format '{{.Names}}' | grep -q '^movie-recommender$'; then
                         echo "Deteniendo y eliminando contenedor existente..."
