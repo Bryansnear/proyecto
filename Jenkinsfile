@@ -6,7 +6,7 @@ pipeline {
             steps {
                 sh '''
                     apt-get update
-                    apt-get install -y python3 python3-pip python3-venv curl
+                    apt-get install -y python3 python3-pip python3-venv curl lsof
                     
                     # Instalar docker-compose
                     curl -L "https://github.com/docker/compose/releases/download/v2.24.6/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
@@ -35,7 +35,7 @@ pipeline {
                     
                     # Asegurarse de que los puertos estén libres
                     for port in 8081 8082 9093; do
-                        pid=$(lsof -ti :$port)
+                        pid=$(lsof -ti :$port || true)
                         if [ ! -z "$pid" ]; then
                             echo "Liberando puerto $port..."
                             kill -9 $pid || true
