@@ -6,7 +6,7 @@ pipeline {
             steps {
                 sh '''
                     apt-get update
-                    apt-get install -y python3 python3-pip python3-venv curl lsof
+                    apt-get install -y python3 python3-pip python3-venv curl lsof findutils
                     
                     # Instalar docker-compose
                     curl -L "https://github.com/docker/compose/releases/download/v2.24.6/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
