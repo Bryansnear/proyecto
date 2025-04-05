@@ -29,16 +29,26 @@ pipeline {
         stage('Build and Deploy') {
             steps {
                 sh '''
-                    # Detener todos los contenedores Docker
-                    echo "Deteniendo todos los contenedores Docker..."
-                    docker ps -q | xargs -r docker stop
-                    docker ps -aq | xargs -r docker rm
+                    echo "Verificando contenedores existentes..."
+                    if docker ps -q --filter name=movie-recommender; then
+                        echo "Deteniendo contenedor movie-recommender existente..."
+                        docker stop $(docker ps -q --filter name=movie-recommender)
+                        docker rm $(docker ps -aq --filter name=movie-recommender)
+                    else
+                        echo "No se encontraron contenedores movie-recommender en ejecución"
+                    fi
                     
-                    # Eliminar todos los volúmenes y redes no utilizados
-                    docker system prune -f --volumes
+                    echo "Limpiando recursos no utilizados..."
+                    docker container prune -f
+                    docker volume prune -f
                     
-                    # Construir y desplegar nuevos contenedores
-                    docker-compose up -d --build movie-recommender
+                    echo "Construyendo y desplegando nuevo contenedor..."
+                    docker-compose build movie-recommender
+                    echo "Iniciando contenedor..."
+                    docker-compose up -d movie-recommender
+                    
+                    echo "Verificando estado del contenedor..."
+                    docker ps --filter name=movie-recommender
                 '''
             }
         }
@@ -58,8 +68,10 @@ pipeline {
         always {
             sh '''
                 rm -rf venv
-                docker-compose down -v || true
-                docker system prune -f --volumes || true
+                if docker ps -q --filter name=movie-recommender; then
+                    docker-compose stop movie-recommender || true
+                    docker-compose rm -f movie-recommender || true
+                fi
             '''
         }
     }
