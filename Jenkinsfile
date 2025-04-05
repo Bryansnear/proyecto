@@ -30,10 +30,11 @@ pipeline {
             steps {
                 sh '''
                     echo "Verificando contenedores existentes..."
-                    if docker ps -q --filter name=movie-recommender; then
-                        echo "Deteniendo contenedor movie-recommender existente..."
-                        docker stop $(docker ps -q --filter name=movie-recommender)
-                        docker rm $(docker ps -aq --filter name=movie-recommender)
+                    CONTAINER_ID=$(docker ps -q --filter name=movie-recommender)
+                    if [ ! -z "$CONTAINER_ID" ]; then
+                        echo "Deteniendo contenedor movie-recommender existente (ID: $CONTAINER_ID)..."
+                        docker stop $CONTAINER_ID
+                        docker rm $CONTAINER_ID
                     else
                         echo "No se encontraron contenedores movie-recommender en ejecución"
                     fi
