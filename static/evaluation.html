@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluación del Sistema de Recomendación</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .metric-card {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #0d6efd;
+        }
+        .movie-item {
+            border-left: 4px solid #0d6efd;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #f8f9fa;
+        }
+        .rating-good {
+            color: #198754;
+        }
+        .rating-bad {
+            color: #dc3545;
+        }
+        .pagination {
+            margin-top: 20px;
+        }
+        .nav-link {
+            color: #0d6efd;
+        }
+        .nav-link.active {
+            font-weight: bold;
+        }
+        .back-button {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.2s;
+            max-width: 300px;
+            text-align: center;
+            text-decoration: none;
+        }
+        .back-button:hover {
+            background-color: #218838;
+            color: white;
+        }
+        .accordion-button:not(.collapsed) {
+            background-color: #e7f1ff;
+            color: #0d6efd;
+        }
+        .accordion-button:focus {
+            box-shadow: none;
+            border-color: rgba(0,0,0,.125);
+        }
+        .user-stats {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1 class="text-center mb-4">Evaluación del Sistema de Recomendación</h1>
+        
+        <!-- Navegación -->
+        <ul class="nav nav-pills mb-4 justify-content-center">
+            <li class="nav-item">
+                <a class="nav-link" href="/">Recomendaciones</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" href="/evaluation.html">Evaluación</a>
+            </li>
+        </ul>
+        
+        <!-- Métricas -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <h5>Accuracy</h5>
+                    <div class="metric-value" id="accuracy">-</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <h5>Precisión</h5>
+                    <div class="metric-value" id="precision">-</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <h5>Recall</h5>
+                    <div class="metric-value" id="recall">-</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <h5>F1-Score</h5>
+                    <div class="metric-value" id="f1">-</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <h5>MAE</h5>
+                    <div class="metric-value" id="mae">-</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <h5>MSE</h5>
+                    <div class="metric-value" id="mse">-</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Usuarios y Recomendaciones -->
+        <div class="accordion" id="usersAccordion"></div>
+        
+        <!-- Paginación -->
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center" id="pagination"></ul>
+        </nav>
+        
+        <!-- Botón para volver al inicio -->
+        <a href="/" class="back-button">Volver a la página principal</a>
+    </div>
+
+    <script>
+        let evaluationData = null;
+        const usersPerPage = 10; // Aumentamos el número de usuarios por página ya que ahora ocupan menos espacio
+        let currentPage = 1;
+
+        // Cargar datos de evaluación
+        async function loadEvaluationData() {
+            try {
+                const response = await fetch('/evaluate');
+                evaluationData = await response.json();
+                updateMetrics();
+                updateUsersList();
+                setupPagination();
+            } catch (error) {
+                console.error('Error cargando datos:', error);
+            }
+        }
+
+        // Actualizar métricas
+        function updateMetrics() {
+            const metrics = evaluationData.diagnostics.accuracy_metrics;
+            document.getElementById('accuracy').textContent = (metrics.accuracy * 100).toFixed(1) + '%';
+            document.getElementById('precision').textContent = (metrics.precision * 100).toFixed(1) + '%';
+            document.getElementById('recall').textContent = (metrics.recall * 100).toFixed(1) + '%';
+            document.getElementById('f1').textContent = (metrics.f1 * 100).toFixed(1) + '%';
+            document.getElementById('mae').textContent = metrics.mae.toFixed(3);
+            document.getElementById('mse').textContent = metrics.mse.toFixed(3);
+        }
+
+        // Crear acordeón de usuario
+        function createUserAccordion(userData, index) {
+            const recommendations = userData.recommendations.map(movie => `
+                <div class="movie-item">
+                    <h6>${movie.title}</h6>
+                    <p class="mb-1">Género: ${movie.genre}</p>
+                    <p class="mb-1">Rating promedio: ${movie.avg_rating.toFixed(2)}</p>
+                    <p class="mb-0">Rating predicho: ${movie.predicted_rating.toFixed(2)}</p>
+                </div>
+            `).join('');
+
+            return `
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                                data-bs-target="#collapse${index}" aria-expanded="false" aria-controls="collapse${index}">
+                            <div class="d-flex justify-content-between align-items-center w-100">
+                                <span>Usuario ${userData.user_id}</span>
+                                <span class="user-stats">${userData.recommendations.length} recomendaciones</span>
+                            </div>
+                        </button>
+                    </h2>
+                    <div id="collapse${index}" class="accordion-collapse collapse" data-bs-parent="#usersAccordion">
+                        <div class="accordion-body">
+                            ${recommendations}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Actualizar lista de usuarios
+        function updateUsersList() {
+            const container = document.getElementById('usersAccordion');
+            container.innerHTML = '';
+            
+            const start = (currentPage - 1) * usersPerPage;
+            const end = start + usersPerPage;
+            const usersToShow = evaluationData.diagnostics.sample_recommendations.slice(start, end);
+            
+            usersToShow.forEach((userData, index) => {
+                container.innerHTML += createUserAccordion(userData, start + index);
+            });
+        }
+
+        // Configurar paginación
+        function setupPagination() {
+            const totalUsers = evaluationData.diagnostics.sample_recommendations.length;
+            const totalPages = Math.ceil(totalUsers / usersPerPage);
+            
+            const pagination = document.getElementById('pagination');
+            pagination.innerHTML = '';
+            
+            // Botón anterior
+            const prevLi = document.createElement('li');
+            prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+            prevLi.innerHTML = '<a class="page-link" href="#" aria-label="Previous"><span aria-hidden="true">&laquo;</span></a>';
+            prevLi.onclick = () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    updateUsersList();
+                    setupPagination();
+                }
+            };
+            pagination.appendChild(prevLi);
+            
+            // Páginas
+            for (let i = 1; i <= totalPages; i++) {
+                const li = document.createElement('li');
+                li.className = `page-item ${currentPage === i ? 'active' : ''}`;
+                li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+                li.onclick = () => {
+                    currentPage = i;
+                    updateUsersList();
+                    setupPagination();
+                };
+                pagination.appendChild(li);
+            }
+            
+            // Botón siguiente
+            const nextLi = document.createElement('li');
+            nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+            nextLi.innerHTML = '<a class="page-link" href="#" aria-label="Next"><span aria-hidden="true">&raquo;</span></a>';
+            nextLi.onclick = () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    updateUsersList();
+                    setupPagination();
+                }
+            };
+            pagination.appendChild(nextLi);
+        }
+
+        // Cargar datos al iniciar
+        loadEvaluationData();
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 
