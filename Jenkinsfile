@@ -46,11 +46,15 @@ pipeline {
             steps {
                 bat '''
                     echo Deteniendo y eliminando contenedor anterior si existe...
-                    for /f "tokens=*" %%a in ('docker ps -q --filter "name=movie-recommender"') do (
-                        echo Deteniendo contenedor %%a
-                        docker stop %%a
-                        echo Eliminando contenedor %%a
-                        docker rm %%a
+                    docker ps -q --filter "name=movie-recommender" > container.txt
+                    if exist container.txt (
+                        for /f %%i in (container.txt) do (
+                            echo Deteniendo contenedor %%i
+                            docker stop %%i
+                            echo Eliminando contenedor %%i
+                            docker rm %%i
+                        )
+                        del container.txt
                     )
                 '''
                 bat '''
@@ -80,11 +84,15 @@ pipeline {
             bat 'rmdir /s /q venv'
             echo 'El pipeline ha fallado'
             bat '''
-                for /f "tokens=*" %%a in ('docker ps -q --filter "name=movie-recommender"') do (
-                    echo Deteniendo contenedor %%a
-                    docker stop %%a
-                    echo Eliminando contenedor %%a
-                    docker rm %%a
+                docker ps -q --filter "name=movie-recommender" > container.txt
+                if exist container.txt (
+                    for /f %%i in (container.txt) do (
+                        echo Deteniendo contenedor %%i
+                        docker stop %%i
+                        echo Eliminando contenedor %%i
+                        docker rm %%i
+                    )
+                    del container.txt
                 )
             '''
         }
