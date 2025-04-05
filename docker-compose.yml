@@ -1,21 +1,6 @@
 version: '3.8'
 
 services:
-  jenkins:
-    image: jenkins/jenkins:lts-jdk17
-    privileged: true
-    user: root
-    ports:
-      - "8083:8080"
-      - "50001:50000"
-    volumes:
-      - jenkins_home:/var/jenkins_home
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      - DOCKER_HOST=unix:///var/run/docker.sock
-    networks:
-      - app-network
-
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
     environment:
@@ -52,11 +37,13 @@ services:
       - kafka
     networks:
       - app-network
+    volumes:
+      - .:/app
+    command: >
+      sh -c "pip install -r requirements.txt &&
+             python api_service.py"
 
 networks:
   app-network:
     name: movie-recommender_app-network
-    driver: bridge
-
-volumes:
-  jenkins_home: 
+    driver: bridge 
