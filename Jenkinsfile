@@ -29,24 +29,20 @@ pipeline {
         stage('Build and Deploy') {
             steps {
                 sh '''
-                    # Mostrar directorio actual y contenido
-                    pwd
-                    ls -la
+                    # Detener y eliminar todos los contenedores existentes
+                    echo "Deteniendo y eliminando contenedores existentes..."
+                    docker-compose down -v || true
                     
-                    # Verificar que docker-compose.yml existe
-                    if [ ! -f "docker-compose.yml" ]; then
-                        echo "Error: docker-compose.yml no encontrado"
-                        exit 1
-                    fi
+                    # Asegurarse de que los puertos estén libres
+                    for port in 8081 8082 9093; do
+                        pid=$(lsof -ti :$port)
+                        if [ ! -z "$pid" ]; then
+                            echo "Liberando puerto $port..."
+                            kill -9 $pid || true
+                        fi
+                    done
                     
-                    # Detener y eliminar contenedor existente si existe
-                    if docker ps -a --format '{{.Names}}' | grep -q '^movie-recommender$'; then
-                        echo "Deteniendo y eliminando contenedor existente..."
-                        docker stop movie-recommender
-                        docker rm movie-recommender
-                    fi
-                    
-                    # Construir y desplegar nuevo contenedor
+                    # Construir y desplegar nuevos contenedores
                     docker-compose up -d --build movie-recommender
                 '''
             }
@@ -56,7 +52,7 @@ pipeline {
             steps {
                 sh '''
                     echo "Esperando que la aplicacion este disponible..."
-                    sleep 10
+                    sleep 20
                     curl -f http://localhost:8082/
                 '''
             }
@@ -67,11 +63,7 @@ pipeline {
         always {
             sh '''
                 rm -rf venv
-                if docker ps -a --format '{{.Names}}' | grep -q '^movie-recommender$'; then
-                    echo "Limpiando contenedor..."
-                    docker stop movie-recommender || true
-                    docker rm movie-recommender || true
-                fi
+                docker-compose down -v || true
             '''
         }
     }
