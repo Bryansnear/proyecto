@@ -2,8 +2,8 @@ pipeline {
     agent any
     
     environment {
-        PYTHON_PATH = '"C:/Users/bryan/AppData/Local/Programs/Python/Python312/python.exe"'
-        PIP_PATH = '"C:/Users/bryan/AppData/Local/Programs/Python/Python312/Scripts/pip.exe"'
+        PYTHON_PATH = 'C:/Users/bryan/AppData/Local/Programs/Python/Python312/python.exe'
+        PIP_PATH = 'C:/Users/bryan/AppData/Local/Programs/Python/Python312/Scripts/pip.exe'
     }
     
     stages {
@@ -16,9 +16,9 @@ pipeline {
         stage('Environment Setup') {
             steps {
                 bat """
-                    "%PYTHON_PATH%" -m venv venv
+                    "${PYTHON_PATH}" -m venv venv
                     call venv\\Scripts\\activate.bat
-                    "%PIP_PATH%" install -r requirements.txt
+                    "${PIP_PATH}" install -r requirements.txt
                 """
                 bat """
                     echo Verificando conexion a Kafka...
