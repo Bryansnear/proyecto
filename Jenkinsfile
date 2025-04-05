@@ -43,6 +43,12 @@ pipeline {
                     docker container prune -f
                     docker volume prune -f
                     
+                    echo "Verificando redes Docker..."
+                    if ! docker network ls | grep -q movie-recommender_app-network; then
+                        echo "Creando red Docker..."
+                        docker network create movie-recommender_app-network
+                    fi
+                    
                     echo "Construyendo y desplegando nuevo contenedor..."
                     docker-compose build movie-recommender
                     echo "Iniciando contenedor..."
@@ -50,6 +56,9 @@ pipeline {
                     
                     echo "Verificando estado del contenedor..."
                     docker ps --filter name=movie-recommender
+                    
+                    echo "Verificando logs del contenedor..."
+                    docker logs movie-recommender-movie-recommender-1
                 '''
             }
         }
@@ -58,8 +67,16 @@ pipeline {
             steps {
                 sh '''
                     echo "Esperando que la aplicacion este disponible..."
-                    sleep 20
-                    curl -f http://localhost:8082/
+                    echo "Verificando red Docker..."
+                    docker network ls
+                    echo "Verificando contenedores en la red..."
+                    docker network inspect movie-recommender_app-network
+                    
+                    echo "Esperando 30 segundos para que el servicio se inicie completamente..."
+                    sleep 30
+                    
+                    echo "Intentando acceder al servicio..."
+                    curl -v movie-recommender-movie-recommender:8082/
                 '''
             }
         }
